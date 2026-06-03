@@ -113,16 +113,14 @@ class LlamaClient:
             }
 
     async def save_slot(self, slot_id: int, basename: str, model_id: str = None) -> bool:
-        # JSON body: {"filename": "..."} — иначе 500 на некоторых сборках
+        path = f"/slots/{slot_id}"
+        body = {"filename": basename}
         if model_id:
-            from urllib.parse import quote
-            path = f"/upstream/{quote(model_id, safe='')}/slots/{slot_id}"
-        else:
-            path = f"/slots/{slot_id}"
+            body["model"] = model_id
         resp = await self.client.post(
             path,
             params={"action": "save"},
-            json={"filename": basename},
+            json=body,
         )
 
         if resp.status_code == 500:
@@ -137,15 +135,14 @@ class LlamaClient:
         return True
 
     async def restore_slot(self, slot_id: int, basename: str, model_id: str = None) -> bool:
+        path = f"/slots/{slot_id}"
+        body = {"filename": basename}
         if model_id:
-            from urllib.parse import quote
-            path = f"/upstream/{quote(model_id, safe='')}/slots/{slot_id}"
-        else:
-            path = f"/slots/{slot_id}"
+            body["model"] = model_id
         resp = await self.client.post(
             path,
             params={"action": "restore"},
-            json={"filename": basename},
+            json=body,
         )
 
         if resp.status_code != 200:
