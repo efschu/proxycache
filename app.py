@@ -3,21 +3,21 @@
 # -*- coding: utf-8 -*-
 
 """
-Simple KV Proxy (бронебойный):
+Simple KV Proxy:
 
-- Большие: LCP→restore, затем чат строго в этот же слот, потом save+meta.
-- Малые: свободный/старый слот, без restore и без дискового save/meta.
-- Пин slota дублируется в root/options/query (через клиента).
+- Big requests: LCP match -> restore, chat pinned to same slot, then save+meta.
+- Small requests: free/oldest slot, no restore, no disk save/meta.
+- Slot pinning duplicated in root/options/query via the client.
 
-Дополнительно:
+Additional:
 
-- acquire_for_request обёрнут в таймаут, чтобы не висеть бесконечно, если слот не отпускается.
-- Для stream:
-    * чтение из llama.cpp идёт в отдельной фоновой задаче (reader);
-    * reader пушит чанки в asyncio.Queue;
-    * в своём finally reader всегда делает save_after + write_meta + release(g),
-      и кладёт в очередь sentinel None;
-    * StreamingResponse читает из очереди и никак не влияет на release слота.
+- acquire_for_request wrapped in timeout to avoid hanging if slot is not released.
+- For streaming:
+    * reading from llama.cpp runs in a separate background task (reader);
+    * reader pushes chunks into asyncio.Queue;
+    * in its finally block reader always does save_after + write_meta + release(g),
+      then puts sentinel None into the queue;
+    * StreamingResponse reads from the queue and does not affect slot release.
 """
 
 import asyncio
@@ -118,12 +118,17 @@ async def start_stream_task(
                 ok = await sm.save_after(g, key, model_id)
             except asyncio.CancelledError:
                 log.warning("save_after_cancelled g=%s key=%s", g, key[:16])
+                raise
             except Exception as e:
                 log.warning("save_after_exception g=%s key=%s: %s", g, key[:16], e)
-            try:
-                hs.write_meta(key, prefix, blocks, WORDS_PER_BLOCK, model_id)
-            except Exception as e:
-                log.warning("write_meta_exception key=%s: %s", key[:16], e)
+            if ok:
+                try:
+                    hs.write_meta(key, prefix, blocks, WORDS_PER_BLOCK, model_id)
+                except Exception as e:
+                    log.warning("write_meta_exception key=%s: %s", key[:16], e)
+            else:
+                log.info("save_failed_deleting_meta key=%s", key[:16])
+                hs.delete_meta(key)
             sm.release(g)
             log.info("stream_reader_done g=%s key=%s saved=%s", g, key[:16], ok)
             try:
@@ -168,7 +173,7 @@ async def chat(req: Request):
     messages: List[Dict] = data.get("messages") or []
     stream = bool(data.get("stream", False))
     client_model = data.get("model") or MODEL_ID
-    # model_id aus dem Request nehmen, nicht von /v1/models
+    # use model_id from the request, not from /v1/models
     backend_model_id = client_model
 
     prefix = hs.raw_prefix(messages)
@@ -304,13 +309,17 @@ async def chat(req: Request):
             try:
                 if is_big:
                     ok = await sm.save_after(g, key, backend_model_id)
-                    hs.write_meta(
-                        key,
-                        prefix,
-                        blocks,
-                        WORDS_PER_BLOCK,
-                        backend_model_id,
-                    )
+                    if ok:
+                        hs.write_meta(
+                            key,
+                            prefix,
+                            blocks,
+                            WORDS_PER_BLOCK,
+                            backend_model_id,
+                        )
+                    else:
+                        log.info("save_failed_deleting_meta key=%s", key[:16])
+                        hs.delete_meta(key)
             finally:
                 sm.release(g)
 

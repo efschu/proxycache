@@ -3,12 +3,12 @@
 # -*- coding: utf-8 -*-
 
 """
-Raw-хэширование: raw_prefix без ролей, только контент, разделённый двойным переводом строки.
+Hashing module: raw_prefix strips roles, keeps only content separated by double newlines.
 
-Блоки по 100 слов, LCP по полным SHA256-хэшам.
-Key = sha256(model_id + "\\n" + raw_prefix), т.е. модель включена в ключ.
+Blocks of 100 words, LCP matching on full SHA256 hashes.
+Key = sha256(model_id + "\\n" + raw_prefix), so model is included in the key.
 
-Метафайлы содержат:
+Meta files contain:
 - key
 - model_id
 - prefix_len
@@ -71,7 +71,7 @@ def lcp_blocks(blocks1: List[str], blocks2: List[str]) -> int:
 
 def prefix_key_sha256(text: str) -> str:
     """
-    Базовая SHA256-обёртка; для кеша в неё передаём model_id + "\\n" + raw_prefix.
+    SHA256 hash wrapper; for cache keys we pass model_id + "\\n" + raw_prefix.
     """
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
@@ -101,9 +101,9 @@ def find_best_restore_candidate(
     model_id: str,
 ) -> Optional[Tuple[str, float]]:
     """
-    Ищет лучший кандидат для restore среди мета-файлов ТОЛЬКО текущей модели.
+    Find the best restore candidate among meta files for the current model only.
 
-    Фильтруем по:
+    Filter by:
     - meta["model_id"] == model_id
     - meta["wpb"] == wpb
     """
@@ -137,7 +137,7 @@ def write_meta(
     model_id: str,
 ) -> None:
     """
-    Записывает/перезаписывает meta-файл для key, привязанный к конкретной модели.
+    Write/overwrite meta file for key, bound to a specific model.
     """
     meta = {
         "key": key,
@@ -152,9 +152,26 @@ def write_meta(
         json.dump(meta, f, indent=2, ensure_ascii=False)
 
 
+def delete_meta(key: str) -> None:
+    """Delete the meta file for a given key."""
+    path = os.path.join(META_DIR, f"{key}.meta.json")
+    try:
+        if os.path.exists(path):
+            os.remove(path)
+            log.info("delete_meta_ok key=%s", key[:16])
+    except Exception as e:
+        log.warning("delete_meta_fail key=%s: %s", key[:16], e)
+
+
+def meta_exists(key: str) -> bool:
+    """Check if a meta file exists for a given key."""
+    path = os.path.join(META_DIR, f"{key}.meta.json")
+    return os.path.exists(path)
+
+
 def touch_meta(key: str) -> None:
     """
-    Обновляет timestamp в существующем meta-файле key.meta.json.
+    Update timestamp in existing meta file key.meta.json.
     """
     path = os.path.join(META_DIR, f"{key}.meta.json")
     try:

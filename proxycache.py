@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Точка запуска uvicorn.
+Uvicorn entry point.
 """
 
 import uvicorn

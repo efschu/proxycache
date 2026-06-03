@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Единая конфигурация для simple_proxycache:
+Configuration for simple_proxycache:
 - BACKENDS: [{"url": "...", "n_slots": N}]
 - WORDS_PER_BLOCK, BIG_THRESHOLD_WORDS, LCP_TH
 - PORT, REQUEST_TIMEOUT, MODEL_ID

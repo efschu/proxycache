@@ -3,11 +3,11 @@
 # -*- coding: utf-8 -*-
 
 """
-Упрощённый SlotManager: только free/oldest по LRU, без hot/cold.
+Simplified SlotManager: free/oldest by LRU, no hot/cold separation.
 
-- get_slot(): сначала свободный (ещё не использовался), иначе самый старый по времени.
-- Для big: если есть restore_key — делаем restore на выбранный слот.
-- Сохранение всегда после завершения запроса.
+- get_slot(): free slot first (unused), otherwise oldest by time.
+- For big requests: if restore_key exists, restore the selected slot.
+- Save always after request completion.
 """
 
 import time

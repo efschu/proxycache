@@ -3,13 +3,13 @@
 # -*- coding: utf-8 -*-
 
 """
-HTTP-клиент к llama.cpp: /v1/chat/completions (stream/non-stream), /slots save/restore, /v1/models.
+HTTP client for llama.cpp: /v1/chat/completions (stream/non-stream), /slots save/restore, /v1/models.
 
-- stream: build_request+send(stream=True), сырые байты.
-- non-stream: строгий JSON парсинг + fallback, если content-type не JSON.
-- /slots: filename в JSON-теле (во избежание 500 parse error).
-- Пин слота дублируется в root/options/query.
-- get_model_id(): получает текущий id модели с /v1/models.
+- stream: build_request+send(stream=True), raw bytes.
+- non-stream: strict JSON parsing + fallback if content-type is not JSON.
+- /slots: filename in JSON body to avoid 500 parse errors.
+- Slot pinning duplicated in root/options/query.
+- get_model_id(): gets current model id from /v1/models.
 """
 
 import httpx
@@ -158,10 +158,10 @@ class LlamaClient:
 
     async def get_model_id(self) -> str:
         """
-        Получает id модели у конкретного llama.cpp через /v1/models.
+        Get model id from the llama.cpp backend via /v1/models.
 
-        Используется только для внутреннего кеширования (ключи файлов/мета),
-        наружу прокси продолжает отдавать MODEL_ID из своей конфигурации.
+        Used only for internal caching (file/meta keys).
+        The proxy continues to return MODEL_ID from its own config to clients.
         """
         try:
             resp = await self.client.get("/v1/models")
